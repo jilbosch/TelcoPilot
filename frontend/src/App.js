@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./lib/auth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Workspace from "./pages/Workspace";
+import Dashboard from "./pages/Dashboard";
 
 function Private({ children }) {
     const { user, loading } = useAuth();
@@ -30,6 +31,14 @@ function PublicOnly({ children }) {
     return children;
 }
 
+function RoleGuard({ roles, children }) {
+    const { user, loading } = useAuth();
+    if (loading) return null;
+    if (!user) return <Navigate to="/login" replace />;
+    if (!roles.includes(user.role)) return <Navigate to="/" replace />;
+    return children;
+}
+
 function App() {
     return (
         <AuthProvider>
@@ -49,6 +58,14 @@ function App() {
                             <PublicOnly>
                                 <Register />
                             </PublicOnly>
+                        }
+                    />
+                    <Route
+                        path="/dashboard"
+                        element={
+                            <RoleGuard roles={["supervisor", "admin"]}>
+                                <Dashboard />
+                            </RoleGuard>
                         }
                     />
                     <Route

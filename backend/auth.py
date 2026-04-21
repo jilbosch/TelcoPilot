@@ -26,10 +26,11 @@ def verify_password(pw: str, hashed: str) -> bool:
         return False
 
 
-def create_token(user_id: str, email: str) -> str:
+def create_token(user_id: str, email: str, role: str = "operator") -> str:
     payload = {
         "sub": user_id,
         "email": email,
+        "role": role,
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXP_HOURS),
         "iat": datetime.now(timezone.utc),
     }
@@ -51,4 +52,17 @@ async def get_current_user(
     if not creds or not creds.credentials:
         raise HTTPException(status_code=401, detail="No autenticado")
     payload = decode_token(creds.credentials)
-    return {"id": payload["sub"], "email": payload["email"]}
+    return {
+        "id": payload["sub"],
+        "email": payload["email"],
+        "role": payload.get("role", "operator"),
+    }
+
+
+def require_role(*allowed: str):
+    async def checker(user=Depends(get_current_user)):
+        if user.get("role") not in allowed:
+            raise HTTPException(status_code=403, detail="Permiso denegado")
+        return user
+
+    return checker

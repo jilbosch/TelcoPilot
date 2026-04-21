@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import Logo from "../components/Logo";
 import RedactedText from "../components/RedactedText";
 import AiOutput from "../components/AiOutput";
+import jsPDF from "jspdf";
 import {
     SmartphoneNfc,
     Network,
@@ -21,6 +23,8 @@ import {
     ShieldCheck,
     FileText,
     Copy,
+    Download,
+    LayoutDashboard,
     History as HistoryIcon,
     Loader2,
     Clock,
@@ -51,6 +55,7 @@ function useDebounced(value, delay = 350) {
 
 export default function Workspace() {
     const { user, logout } = useAuth();
+    const nav = useNavigate();
     const [catalog, setCatalog] = useState([]);
     const [selected, setSelected] = useState(null); // incident_type id
     const [session, setSession] = useState(null);
@@ -158,6 +163,106 @@ export default function Workspace() {
         setTimeout(() => setCopied(false), 1500);
     };
 
+    const [copiedJira, setCopiedJira] = useState(false);
+    const copyJira = async () => {
+        if (!summary) return;
+        // Convert markdown-like ** to Jira *bold* and ## to h3.
+        const jira = summary
+            .replace(/^## (.+)$/gm, "h3. $1")
+            .replace(/\*\*(.+?)\*\*/g, "*$1*");
+        await navigator.clipboard.writeText(jira);
+        setCopiedJira(true);
+        setTimeout(() => setCopiedJira(false), 1500);
+    };
+
+    const downloadPdf = () => {
+        if (!summary || !session) return;
+        const doc = new jsPDF({ unit: "pt", format: "a4" });
+        const margin = 48;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const maxWidth = pageWidth - margin * 2;
+        let y = margin;
+
+        // Header
+        doc.setFillColor(11, 17, 32);
+        doc.rect(0, 0, pageWidth, 72, "F");
+        doc.setTextColor(0, 229, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text("TelcoPilot", margin, 40);
+        doc.setTextColor(148, 163, 184);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text("Ticket de escalado · Nivel 2", margin, 58);
+        doc.setTextColor(148, 163, 184);
+        doc.text(
+            new Date().toLocaleString("es-ES"),
+            pageWidth - margin,
+            58,
+            { align: "right" }
+        );
+        y = 110;
+
+        // Meta
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("Incidencia:", margin, y);
+        doc.setFont("helvetica", "normal");
+        doc.text(session.incident_title, margin + 80, y);
+        y += 16;
+        doc.setFont("helvetica", "bold");
+        doc.text("Operador:", margin, y);
+        doc.setFont("helvetica", "normal");
+        doc.text(user?.name || "—", margin + 80, y);
+        y += 16;
+        doc.setFont("helvetica", "bold");
+        doc.text("Sesión ID:", margin, y);
+        doc.setFont("helvetica", "normal");
+        doc.text(session.id, margin + 80, y);
+        y += 24;
+
+        // Divider
+        doc.setDrawColor(33, 46, 78);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 16;
+
+        // Body: strip markdown
+        const cleanText = summary
+            .replace(/^## (.+)$/gm, "$1")
+            .replace(/\*\*(.+?)\*\*/g, "$1");
+        doc.setFontSize(10);
+        doc.setTextColor(30, 41, 59);
+        const lines = doc.splitTextToSize(cleanText, maxWidth);
+        lines.forEach((line) => {
+            if (y > 780) {
+                doc.addPage();
+                y = margin;
+            }
+            doc.text(line, margin, y);
+            y += 14;
+        });
+
+        // Footer
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text(
+                "Documento generado automáticamente · Sin datos personales · RGPD",
+                margin,
+                820
+            );
+            doc.text(`${i}/${pageCount}`, pageWidth - margin, 820, {
+                align: "right",
+            });
+        }
+
+        const fname = `telcopilot-ticket-${session.incident_type}-${session.id.slice(0, 8)}.pdf`;
+        doc.save(fname);
+    };
+
     const loadHistoryItem = async (sid) => {
         const r = await api.get(`/sessions/${sid}`);
         setSession(r.data);
@@ -207,6 +312,19 @@ export default function Workspace() {
                             <ShieldCheck size={11} />
                             RGPD Activo
                         </span>
+                        {(user?.role === "supervisor" ||
+                            user?.role === "admin") && (
+                            <button
+                                onClick={() => nav("/dashboard")}
+                                className="tp-btn-secondary flex items-center gap-2"
+                                data-testid="nav-dashboard-btn"
+                            >
+                                <LayoutDashboard size={13} />
+                                <span className="hidden sm:inline">
+                                    Dashboard
+                                </span>
+                            </button>
+                        )}
                         <div
                             className="text-right hidden md:block"
                             data-testid="operator-name"
@@ -553,18 +671,39 @@ export default function Workspace() {
                                             Ticket de escalado a Nivel 2
                                         </h3>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap justify-end">
                                         {summary && (
-                                            <button
-                                                onClick={copySummary}
-                                                className="tp-btn-secondary flex items-center gap-2"
-                                                data-testid="copy-summary-btn"
-                                            >
-                                                <Copy size={13} />
-                                                {copied
-                                                    ? "Copiado ✓"
-                                                    : "Copiar"}
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={downloadPdf}
+                                                    className="tp-btn-secondary flex items-center gap-2"
+                                                    data-testid="download-pdf-btn"
+                                                >
+                                                    <Download size={13} />
+                                                    PDF
+                                                </button>
+                                                <button
+                                                    onClick={copyJira}
+                                                    className="tp-btn-secondary flex items-center gap-2"
+                                                    data-testid="copy-jira-btn"
+                                                    title="Copiar con formato Jira"
+                                                >
+                                                    <Copy size={13} />
+                                                    {copiedJira
+                                                        ? "Copiado ✓"
+                                                        : "Jira"}
+                                                </button>
+                                                <button
+                                                    onClick={copySummary}
+                                                    className="tp-btn-secondary flex items-center gap-2"
+                                                    data-testid="copy-summary-btn"
+                                                >
+                                                    <Copy size={13} />
+                                                    {copied
+                                                        ? "Copiado ✓"
+                                                        : "Copiar"}
+                                                </button>
+                                            </>
                                         )}
                                         <button
                                             onClick={genSummary}

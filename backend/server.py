@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from starlette.middleware.cors import CORSMiddleware
 
 from anonymizer import anonymize_text
-from auth import create_token, get_current_user, hash_password, verify_password
+from auth import create_token, get_current_user, hash_password, require_role, verify_password
 from incidents import get_catalog, get_incident
 
 # ---------- MongoDB ----------
@@ -45,6 +45,7 @@ class UserOut(BaseModel):
     id: str
     email: EmailStr
     name: str
+    role: str = "operator"
 
 
 class AuthResponse(BaseModel):
@@ -185,13 +186,15 @@ async def register(body: UserRegister):
         "id": uid,
         "email": body.email.lower(),
         "name": body.name,
+        "role": "operator",
         "password_hash": hash_password(body.password),
         "created_at": now_iso(),
     }
     await db.users.insert_one(doc)
-    token = create_token(uid, body.email.lower())
+    token = create_token(uid, body.email.lower(), "operator")
     return AuthResponse(
-        token=token, user=UserOut(id=uid, email=body.email.lower(), name=body.name)
+        token=token,
+        user=UserOut(id=uid, email=body.email.lower(), name=body.name, role="operator"),
     )
 
 
@@ -200,9 +203,11 @@ async def login(body: UserLogin):
     user = await db.users.find_one({"email": body.email.lower()}, {"_id": 0})
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
-    token = create_token(user["id"], user["email"])
+    role = user.get("role", "operator")
+    token = create_token(user["id"], user["email"], role)
     return AuthResponse(
-        token=token, user=UserOut(id=user["id"], email=user["email"], name=user["name"])
+        token=token,
+        user=UserOut(id=user["id"], email=user["email"], name=user["name"], role=role),
     )
 
 
@@ -211,7 +216,9 @@ async def me(user=Depends(get_current_user)):
     doc = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return UserOut(id=doc["id"], email=doc["email"], name=doc["name"])
+    return UserOut(
+        id=doc["id"], email=doc["email"], name=doc["name"], role=doc.get("role", "operator")
+    )
 
 
 # ---------- Incident catalog ----------
@@ -350,6 +357,143 @@ async def my_stats(user=Depends(get_current_user)):
         {"operator_id": user["id"], "summary": {"$ne": None}}
     )
     return {"total": total, "today": today, "escalated": resolved}
+
+
+# ---------- Supervisor dashboard ----------
+@api.get("/admin/overview")
+async def admin_overview(user=Depends(require_role("supervisor", "admin"))):
+    """Aggregated metrics for supervisor/admin. No PII exposed."""
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    week_start = (now - timedelta(days=7)).isoformat()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+    total = await db.sessions.count_documents({})
+    today = await db.sessions.count_documents({"created_at": {"$gte": today_start}})
+    week = await db.sessions.count_documents({"created_at": {"$gte": week_start}})
+    escalated = await db.sessions.count_documents({"summary": {"$ne": None}})
+
+    # Incidents breakdown
+    pipeline_inc = [
+        {"$group": {"_id": "$incident_title", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10},
+    ]
+    inc_counts = await db.sessions.aggregate(pipeline_inc).to_list(20)
+    incidents_breakdown = [{"title": d["_id"], "count": d["count"]} for d in inc_counts]
+
+    # Per-operator stats (join users)
+    pipeline_op = [
+        {
+            "$group": {
+                "_id": "$operator_id",
+                "sessions": {"$sum": 1},
+                "escalated": {
+                    "$sum": {"$cond": [{"$ne": ["$summary", None]}, 1, 0]}
+                },
+            }
+        },
+        {"$sort": {"sessions": -1}},
+        {"$limit": 20},
+    ]
+    ops_raw = await db.sessions.aggregate(pipeline_op).to_list(50)
+    # Resolve names
+    op_ids = [o["_id"] for o in ops_raw]
+    users = await db.users.find(
+        {"id": {"$in": op_ids}}, {"_id": 0, "id": 1, "name": 1, "email": 1}
+    ).to_list(100)
+    user_map = {u["id"]: u for u in users}
+    per_operator = [
+        {
+            "operator_id": o["_id"],
+            "name": user_map.get(o["_id"], {}).get("name", "—"),
+            "email": user_map.get(o["_id"], {}).get("email", "—"),
+            "sessions": o["sessions"],
+            "escalated": o["escalated"],
+            "escalation_rate": round(o["escalated"] / o["sessions"], 3) if o["sessions"] else 0,
+        }
+        for o in ops_raw
+    ]
+
+    # Sessions per day (last 7)
+    daily = []
+    for i in range(6, -1, -1):
+        d = now - timedelta(days=i)
+        start = d.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        end = d.replace(hour=23, minute=59, second=59, microsecond=0).isoformat()
+        c = await db.sessions.count_documents(
+            {"created_at": {"$gte": start, "$lte": end}}
+        )
+        daily.append({"date": d.strftime("%d/%m"), "sessions": c})
+
+    # Avg resolution (TMO proxy): avg seconds between created_at and updated_at for sessions with summary
+    pipeline_tmo = [
+        {"$match": {"summary": {"$ne": None}}},
+        {
+            "$project": {
+                "dur": {
+                    "$dateDiff": {
+                        "startDate": {"$toDate": "$created_at"},
+                        "endDate": {"$toDate": "$updated_at"},
+                        "unit": "second",
+                    }
+                }
+            }
+        },
+        {"$group": {"_id": None, "avg": {"$avg": "$dur"}}},
+    ]
+    tmo_agg = await db.sessions.aggregate(pipeline_tmo).to_list(1)
+    avg_seconds = int(tmo_agg[0]["avg"]) if tmo_agg and tmo_agg[0].get("avg") else 0
+
+    # Total operator count
+    operators = await db.users.count_documents({"role": "operator"})
+
+    return {
+        "kpis": {
+            "total_sessions": total,
+            "today": today,
+            "week": week,
+            "escalated": escalated,
+            "escalation_rate": round(escalated / total, 3) if total else 0,
+            "avg_resolution_seconds": avg_seconds,
+            "operators": operators,
+        },
+        "incidents_breakdown": incidents_breakdown,
+        "per_operator": per_operator,
+        "daily": daily,
+    }
+
+
+# ---------- Startup: seed supervisor ----------
+async def seed_supervisor():
+    sup_email = "supervisor@telco.es"
+    existing = await db.users.find_one({"email": sup_email})
+    if existing:
+        # Ensure role upgraded if legacy doc exists
+        if existing.get("role") != "supervisor":
+            await db.users.update_one(
+                {"email": sup_email}, {"$set": {"role": "supervisor"}}
+            )
+        return
+    await db.users.insert_one(
+        {
+            "id": str(uuid.uuid4()),
+            "email": sup_email,
+            "name": "Supervisor Demo",
+            "role": "supervisor",
+            "password_hash": hash_password("super123"),
+            "created_at": now_iso(),
+        }
+    )
+
+
+@app.on_event("startup")
+async def on_startup():
+    try:
+        await seed_supervisor()
+    except Exception:
+        logging.exception("Seeding supervisor failed")
 
 
 # ---------- Root ----------

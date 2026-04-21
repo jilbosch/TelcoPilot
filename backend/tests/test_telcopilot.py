@@ -227,3 +227,88 @@ class TestLLM:
         r = session_client.get(f"{API}/stats/me", headers=_h(user_a["token"]))
         assert r.status_code == 200
         assert r.json()["escalated"] >= 1
+
+
+# ---------- P2: Role-based auth + supervisor dashboard ----------
+SUPERVISOR_EMAIL = "supervisor@telco.es"
+SUPERVISOR_PASSWORD = "super123"
+OPERATOR_EMAIL = "operador@telco.es"
+OPERATOR_PASSWORD = "telco123"
+
+
+def _ensure_operator(s):
+    # Try login first; if fails, register
+    r = s.post(f"{API}/auth/login", json={"email": OPERATOR_EMAIL, "password": OPERATOR_PASSWORD})
+    if r.status_code == 200:
+        return r.json()
+    r = s.post(f"{API}/auth/register", json={"email": OPERATOR_EMAIL, "password": OPERATOR_PASSWORD, "name": "María García"})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+class TestRoles:
+    def test_supervisor_login_returns_role(self, session_client):
+        r = session_client.post(f"{API}/auth/login", json={"email": SUPERVISOR_EMAIL, "password": SUPERVISOR_PASSWORD})
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["user"]["role"] == "supervisor"
+        assert data["user"]["email"] == SUPERVISOR_EMAIL
+        pytest.sup_token = data["token"]
+
+    def test_supervisor_me_role(self, session_client):
+        r = session_client.get(f"{API}/auth/me", headers=_h(pytest.sup_token))
+        assert r.status_code == 200
+        assert r.json()["role"] == "supervisor"
+
+    def test_operator_login_returns_role(self, session_client):
+        data = _ensure_operator(session_client)
+        assert data["user"]["role"] == "operator"
+        pytest.op_token = data["token"]
+
+    def test_operator_me_role(self, session_client):
+        r = session_client.get(f"{API}/auth/me", headers=_h(pytest.op_token))
+        assert r.status_code == 200
+        assert r.json()["role"] == "operator"
+
+    def test_new_register_default_operator(self, session_client, user_b):
+        r = session_client.get(f"{API}/auth/me", headers=_h(user_b["token"]))
+        assert r.status_code == 200
+        assert r.json()["role"] == "operator"
+
+
+class TestAdminOverview:
+    def test_supervisor_can_access_overview(self, session_client):
+        r = session_client.get(f"{API}/admin/overview", headers=_h(pytest.sup_token))
+        assert r.status_code == 200, r.text
+        data = r.json()
+        # Structure checks
+        assert "kpis" in data
+        assert "incidents_breakdown" in data
+        assert "per_operator" in data
+        assert "daily" in data
+        # KPI fields
+        kpis = data["kpis"]
+        for k in ["total_sessions", "today", "week", "escalated", "escalation_rate", "avg_resolution_seconds", "operators"]:
+            assert k in kpis, f"Missing kpi: {k}"
+        # Daily must be 7 entries
+        assert isinstance(data["daily"], list)
+        assert len(data["daily"]) == 7
+        for d in data["daily"]:
+            assert "date" in d and "sessions" in d
+        # Types
+        assert isinstance(data["incidents_breakdown"], list)
+        assert isinstance(data["per_operator"], list)
+
+    def test_operator_forbidden_from_overview(self, session_client):
+        r = session_client.get(f"{API}/admin/overview", headers=_h(pytest.op_token))
+        assert r.status_code == 403
+
+    def test_overview_no_auth(self, session_client):
+        r = session_client.get(f"{API}/admin/overview")
+        assert r.status_code == 401
+
+    def test_operator_stats_still_works(self, session_client):
+        r = session_client.get(f"{API}/stats/me", headers=_h(pytest.op_token))
+        assert r.status_code == 200
+        assert "total" in r.json()
+
