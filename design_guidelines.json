@@ -1,0 +1,146 @@
+{
+  "project_name": "TelcoPilot",
+  "domain": "Enterprise B2B SaaS (Telecom Helpdesk)",
+  "theme": "Dark",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) + NOC Tech Variant",
+  "colors": {
+    "primary": {
+      "base": "#0B1120",
+      "surface": "#121C33",
+      "surface_elevated": "#1A2542",
+      "border": "#212E4E"
+    },
+    "brand": {
+      "accent_primary": "#0055FF",
+      "accent_primary_hover": "#3377FF",
+      "accent_secondary": "#00E5FF",
+      "accent_secondary_hover": "#33EEFF"
+    },
+    "status": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "gdpr_safe": "#8B5CF6"
+    },
+    "text": {
+      "primary": "#F8FAFC",
+      "secondary": "#94A3B8",
+      "muted": "#64748B",
+      "redacted": "#00E5FF"
+    }
+  },
+  "typography": {
+    "families": {
+      "heading": "Chivo",
+      "body": "IBM Plex Sans",
+      "mono": "IBM Plex Mono"
+    },
+    "rules": {
+      "headings": "Tracking-tight, uppercase for section headers (tracking-[0.2em])",
+      "body": "Leading-snug for dense reading",
+      "mono": "Used for IP addresses, phone numbers, DNI, and [REDACTED] badges"
+    },
+    "sizes": {
+      "h1": "text-2xl sm:text-3xl font-bold",
+      "h2": "text-lg sm:text-xl font-semibold",
+      "body": "text-sm",
+      "small": "text-xs"
+    }
+  },
+  "spacing_and_layout": {
+    "system": "Dense 'Control Room' (Mode B)",
+    "container_padding": "p-4 sm:p-6",
+    "gap": "gap-3 sm:gap-4",
+    "border_radius": "rounded-md",
+    "grid_rules": "All panels must have h-full to align bottom edges. Utilize border-collapse style layouts where possible to save space."
+  },
+  "surfaces": {
+    "dashboard_panels": {
+      "background": "bg-[#121C33]",
+      "border": "border border-[#212E4E]",
+      "shadow": "shadow-none",
+      "radius": "rounded-md",
+      "hover": "hover:border-[#0055FF]/50 transition-colors duration-200"
+    },
+    "gdpr_panel": {
+      "background": "bg-[#0B1120]",
+      "border": "border border-violet-500/30",
+      "special_effect": "Subtle inset shadow, resembles a secure terminal"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#0055FF] text-white rounded-sm px-4 py-2 hover:bg-[#3377FF] font-semibold text-sm transition-all",
+      "secondary": "bg-[#1A2542] text-[#F8FAFC] border border-[#212E4E] rounded-sm px-4 py-2 hover:bg-[#212E4E] transition-all",
+      "ghost": "text-[#94A3B8] hover:text-white hover:bg-[#1A2542] rounded-sm"
+    },
+    "inputs": {
+      "textarea": "bg-[#0B1120] border border-[#212E4E] text-[#F8FAFC] p-3 text-sm focus:border-[#0055FF] focus:ring-1 focus:ring-[#0055FF] rounded-sm resize-none",
+      "search": "Similar to textarea but single line, with Lucide Search icon"
+    },
+    "incident_cards": {
+      "base": "flex flex-col items-center justify-center p-3 bg-[#1A2542] border border-[#212E4E] rounded-sm cursor-pointer hover:border-[#0055FF] transition-all text-center",
+      "active": "bg-[#0055FF]/10 border-[#0055FF] text-[#00E5FF]"
+    },
+    "checklist_item": {
+      "container": "flex items-center justify-between p-2 border-b border-[#212E4E] last:border-0",
+      "actions": "flex gap-2"
+    },
+    "gdpr_badge": {
+      "style": "inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-violet-500/20 text-violet-400 border border-violet-500/30"
+    }
+  },
+  "screens": {
+    "login": {
+      "layout": "Split screen or centered card with heavy glassmorphism over NOC background.",
+      "background_image": "https://images.pexels.com/photos/4716292/pexels-photo-4716292.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "elements": [
+        "Logo: TelcoPilot (with Cyan/Blue icon)",
+        "JWT Auth Form (Email, Password)",
+        "Login CTA",
+        "GDPR Compliance Badge at bottom"
+      ]
+    },
+    "call_workspace": {
+      "layout": "Grid-based Control Room",
+      "sidebar": {
+        "width": "w-64",
+        "content": [
+          "Operator Profile",
+          "Stats Grid (Llamadas, TMO)",
+          "Historial de Sesiones"
+        ]
+      },
+      "main_content": {
+        "top_section": "Incident Grid (8 cards: Sin datos móviles, APN, Roaming, Fibra caída, Router, Portabilidad, Microcortes, Velocidad lenta)",
+        "middle_section": "Split view: Left (Chat/Free-text input for AI), Right (Guided Diagnostic Checklist)",
+        "bottom_section": "Split view: Left (AI Suggestions Output), Right (GDPR Anonymization Preview + Generate Ticket)"
+      }
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "mapping": {
+      "Sin datos móviles": "SmartphoneNfc",
+      "APN": "Network",
+      "Roaming": "Globe2",
+      "Fibra caída": "Cable",
+      "Router": "Router",
+      "Portabilidad": "ArrowRightLeft",
+      "Microcortes": "Activity",
+      "Velocidad lenta": "Gauge",
+      "GDPR Badge": "ShieldCheck"
+    }
+  },
+  "media": {
+    "images": {
+      "login_background": {
+        "url": "https://images.pexels.com/photos/4716292/pexels-photo-4716292.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Blue fiber optic cables connected to server, NOC vibe"
+      }
+    }
+  },
+  "testing_instructions": {
+    "attributes": "All interactive elements must include 'data-testid' (e.g., data-testid='incident-card-apn', data-testid='login-button', data-testid='generate-ticket-btn')"
+  }
+}
