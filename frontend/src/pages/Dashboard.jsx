@@ -154,8 +154,8 @@ export default function Dashboard() {
                         <h3 className="font-display text-sm font-bold text-white mb-3">
                             Sesiones últimos 7 días
                         </h3>
-                        <div className="h-[240px]">
-                            <ResponsiveContainer>
+                        <div className="h-[240px]" style={{ minHeight: 240, minWidth: 0 }}>
+                            <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={data.daily}>
                                     <CartesianGrid
                                         stroke="#212E4E"
@@ -196,8 +196,8 @@ export default function Dashboard() {
                         <h3 className="font-display text-sm font-bold text-white mb-3">
                             Incidencias más comunes
                         </h3>
-                        <div className="h-[240px]">
-                            <ResponsiveContainer>
+                        <div className="h-[240px]" style={{ minHeight: 240, minWidth: 0 }}>
+                            <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
                                     data={data.incidents_breakdown}
                                     layout="vertical"
