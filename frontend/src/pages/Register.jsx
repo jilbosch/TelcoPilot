@@ -29,11 +29,11 @@ export default function Register() {
 
     return (
         <div
-            className="min-h-screen flex items-center justify-center p-4"
+            className="relative min-h-screen flex items-center justify-center p-4"
             data-testid="register-page"
         >
-            <div className="tp-grid-bg absolute inset-0 opacity-20" />
-            <div className="relative w-full max-w-[420px] tp-panel p-8 tp-fade-up">
+            <div className="tp-grid-bg absolute inset-0 opacity-20 pointer-events-none" />
+            <div className="relative z-10 w-full max-w-[420px] tp-panel p-8 tp-fade-up">
                 <Logo size={20} />
                 <div className="eyebrow mt-6 mb-2">Nuevo operador</div>
                 <h2 className="font-display text-2xl font-bold text-white mb-6">
