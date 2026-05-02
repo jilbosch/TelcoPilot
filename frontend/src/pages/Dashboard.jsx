@@ -30,14 +30,60 @@ export default function Dashboard() {
     const nav = useNavigate();
     const [data, setData] = useState(null);
     const [err, setErr] = useState("");
+    const [seeding, setSeeding] = useState(false);
+    const [seedMsg, setSeedMsg] = useState("");
 
-    useEffect(() => {
+    const reload = () => {
         api.get("/admin/overview")
             .then((r) => setData(r.data))
             .catch((e) =>
                 setErr(e?.response?.data?.detail || "Error al cargar")
             );
+    };
+
+    useEffect(() => {
+        reload();
     }, []);
+
+    const seedDemo = async () => {
+        setSeeding(true);
+        setSeedMsg("");
+        try {
+            const r = await api.post("/admin/seed-demo");
+            if (r.data.already_seeded) {
+                setSeedMsg("Los datos demo ya estaban cargados.");
+            } else {
+                setSeedMsg(
+                    `✓ ${r.data.created_operators} operadores y ${r.data.created_sessions} sesiones creadas.`
+                );
+            }
+            reload();
+        } catch (e) {
+            setSeedMsg(
+                "Error: " + (e?.response?.data?.detail || e.message)
+            );
+        } finally {
+            setSeeding(false);
+            setTimeout(() => setSeedMsg(""), 6000);
+        }
+    };
+
+    const resetDemo = async () => {
+        if (!window.confirm("¿Eliminar todas las sesiones demo?")) return;
+        setSeeding(true);
+        try {
+            const r = await api.post("/admin/reset-demo");
+            setSeedMsg(`✓ ${r.data.deleted_sessions} sesiones demo eliminadas.`);
+            reload();
+        } catch (e) {
+            setSeedMsg(
+                "Error: " + (e?.response?.data?.detail || e.message)
+            );
+        } finally {
+            setSeeding(false);
+            setTimeout(() => setSeedMsg(""), 6000);
+        }
+    };
 
     if (err) {
         return (
@@ -81,6 +127,29 @@ export default function Dashboard() {
                         </span>
                     </div>
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={seedDemo}
+                            disabled={seeding}
+                            className="tp-btn-secondary flex items-center gap-2"
+                            data-testid="seed-demo-btn"
+                            title="Cargar sesiones y operadores de demostración"
+                        >
+                            {seeding ? (
+                                <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                                <Database size={13} />
+                            )}
+                            <span className="hidden sm:inline">Cargar demo</span>
+                        </button>
+                        <button
+                            onClick={resetDemo}
+                            disabled={seeding}
+                            className="tp-btn-ghost flex items-center gap-1"
+                            data-testid="reset-demo-btn"
+                            title="Eliminar sesiones demo"
+                        >
+                            <Trash2 size={12} />
+                        </button>
                         <div className="text-right hidden md:block">
                             <div className="text-[12px] text-white font-medium">
                                 {user?.name}
@@ -109,6 +178,22 @@ export default function Dashboard() {
             </header>
 
             <div className="flex-1 p-4 space-y-4">
+                {seedMsg && (
+                    <div
+                        className="tp-panel p-3 text-[12px] font-mono"
+                        style={{
+                            borderColor: seedMsg.startsWith("Error")
+                                ? "#EF4444"
+                                : "#10B981",
+                            color: seedMsg.startsWith("Error")
+                                ? "#F87171"
+                                : "#34D399",
+                        }}
+                        data-testid="seed-msg"
+                    >
+                        {seedMsg}
+                    </div>
+                )}
                 {/* KPIs */}
                 <section
                     className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"

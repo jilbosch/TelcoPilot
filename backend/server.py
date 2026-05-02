@@ -18,6 +18,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from anonymizer import anonymize_text
 from auth import create_token, get_current_user, hash_password, require_role, verify_password
+from demo_seed import reset_demo_data, seed_demo_data
 from incidents import get_catalog, get_incident
 
 # ---------- MongoDB ----------
@@ -494,6 +495,19 @@ async def on_startup():
         await seed_supervisor()
     except Exception:
         logging.exception("Seeding supervisor failed")
+
+
+# ---------- Demo data endpoints (supervisor/admin) ----------
+@api.post("/admin/seed-demo")
+async def admin_seed_demo(user=Depends(require_role("supervisor", "admin"))):
+    result = await seed_demo_data(db)
+    return {"ok": True, **result}
+
+
+@api.post("/admin/reset-demo")
+async def admin_reset_demo(user=Depends(require_role("supervisor", "admin"))):
+    result = await reset_demo_data(db)
+    return {"ok": True, **result}
 
 
 # ---------- Root ----------
