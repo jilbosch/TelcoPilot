@@ -20,6 +20,8 @@ import {
     Clock,
     ArrowLeft,
     Loader2,
+    Database,
+    Trash2,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
