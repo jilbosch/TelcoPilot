@@ -26,6 +26,7 @@ import {
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import Logo from "../components/Logo";
+import OperatorSessionsDrawer from "../components/OperatorSessionsDrawer";
 
 export default function Dashboard() {
     const { user, logout } = useAuth();
@@ -34,6 +35,7 @@ export default function Dashboard() {
     const [err, setErr] = useState("");
     const [seeding, setSeeding] = useState(false);
     const [seedMsg, setSeedMsg] = useState("");
+    const [drawerOp, setDrawerOp] = useState(null);
 
     const reload = () => {
         api.get("/admin/overview")
@@ -337,6 +339,12 @@ export default function Dashboard() {
                             <h3 className="font-display text-sm font-bold text-white">
                                 Rendimiento por operador
                             </h3>
+                            <div
+                                className="eyebrow mt-1"
+                                style={{ fontSize: 9, letterSpacing: "0.15em", color: "#64748B" }}
+                            >
+                                Haz clic en un operador para ver sus tickets
+                            </div>
                         </div>
                         <div className="eyebrow">
                             {data.per_operator.length} operadores activos
@@ -398,6 +406,11 @@ export default function Dashboard() {
                     </div>
                 </section>
             </div>
+
+            <OperatorSessionsDrawer
+                operatorId={drawerOp}
+                onClose={() => setDrawerOp(null)}
+            />
         </div>
     );
 }
@@ -450,6 +463,16 @@ function EscalationBadge({ rate }) {
     const pct = Math.round(rate * 100);
     const color =
         rate <= 0.3 ? "#10B981" : rate <= 0.6 ? "#F59E0B" : "#EF4444";
+    return (
+        <span
+            className="font-mono font-semibold"
+            style={{ color }}
+        >
+            {pct}%
+        </span>
+    );
+}
+ 0.6 ? "#F59E0B" : "#EF4444";
     return (
         <span
             className="font-mono font-semibold"

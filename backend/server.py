@@ -510,6 +510,35 @@ async def admin_reset_demo(user=Depends(require_role("supervisor", "admin"))):
     return {"ok": True, **result}
 
 
+# ---------- Admin: browse operator's sessions ----------
+@api.get("/admin/operators/{operator_id}/sessions")
+async def admin_operator_sessions(
+    operator_id: str, user=Depends(require_role("supervisor", "admin"))
+):
+    op = await db.users.find_one({"id": operator_id}, {"_id": 0, "password_hash": 0})
+    if not op:
+        raise HTTPException(status_code=404, detail="Operador no encontrado")
+    sessions = (
+        await db.sessions.find({"operator_id": operator_id}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(200)
+    )
+    return {
+        "operator": {"id": op["id"], "name": op["name"], "email": op["email"]},
+        "sessions": sessions,
+    }
+
+
+@api.get("/admin/sessions/{session_id}", response_model=SessionOut)
+async def admin_get_session(
+    session_id: str, user=Depends(require_role("supervisor", "admin"))
+):
+    doc = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    return SessionOut(**doc)
+
+
 # ---------- Root ----------
 @api.get("/")
 async def root():
