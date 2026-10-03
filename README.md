@@ -4,7 +4,7 @@
 > Diagnóstico guiado, asistencia IA y escalados a Nivel 2 sin comprometer datos sensibles.
 
 ![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20React%20%2B%20MongoDB-0055FF)
-![AI](https://img.shields.io/badge/AI-Claude%20Sonnet%204.5-00E5FF)
+![AI](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-00E5FF)
 ![GDPR](https://img.shields.io/badge/RGPD-Compliant-8B5CF6)
 ![License](https://img.shields.io/badge/license-Proprietary-111827)
 
@@ -27,7 +27,7 @@ Además, los operadores manejan **datos personales del cliente** (DNI, teléfono
 **TelcoPilot** es un copiloto IA diseñado específicamente para Nivel 1:
 
 - ✅ **Diagnóstico guiado paso a paso** con checklists predefinidos por tipo de incidencia.
-- ✅ **Sugerencias IA** basadas en el texto libre del operador (Claude Sonnet 4.5).
+- ✅ **Sugerencias IA** basadas en el texto libre del operador (Gemini 2.5 Flash).
 - ✅ **Anonimización automática** de datos sensibles **antes** de enviar a la IA — el LLM nunca ve PII.
 - ✅ **Tickets de escalado a Nivel 2** generados con un clic, exportables a PDF o formato Jira.
 - ✅ **Dashboard de supervisor** con KPIs agregados (TMO, FCR, escalados, ranking).
@@ -65,13 +65,13 @@ Layout en "sala de control" con 4 paneles:
                                        └─────────┬────────────┘
                                                  │
                                       ┌──────────▼──────────┐       ┌───────────────────┐
-                                      │  MongoDB            │       │  Emergent LLM Key │
-                                      │  users + sessions   │       │  Claude Sonnet 4.5│
+                                      │  MongoDB            │       │  Google Gemini API│
+                                      │  users + sessions   │       │  Gemini 2.5 Flash │
                                       └─────────────────────┘       └───────────────────┘
 ```
 
 ### Tech stack
-- **Backend:** Python 3.11, FastAPI, Motor (async Mongo), PyJWT, bcrypt, emergentintegrations (Claude Sonnet 4.5).
+- **Backend:** Python 3.11, FastAPI, Motor (async Mongo), PyJWT, bcrypt, google-generativeai (Gemini 2.5 Flash).
 - **Frontend:** React 19, react-router-dom 7, Tailwind CSS, lucide-react, recharts, jsPDF, axios.
 - **Database:** MongoDB (2 collections: `users`, `sessions`).
 - **Auth:** JWT con `role` claim (`operator` / `supervisor` / `admin`).
@@ -90,7 +90,7 @@ Backend recibe texto
  └──────────┬──────────────┘
             │ solo texto anonimizado
             ▼
-       Claude Sonnet 4.5
+       Gemini 2.5 Flash
             │
             ▼
    Diagnóstico sugerido
@@ -128,7 +128,7 @@ yarn start    # por defecto en http://localhost:3000
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=telcopilot
 CORS_ORIGINS=*
-EMERGENT_LLM_KEY=sk-emergent-xxxx          # pedir a Emergent o usar OPENAI_API_KEY / ANTHROPIC_API_KEY propia
+GEMINI_API_KEY=tu-clave-gemini            # https://aistudio.google.com/apikey
 JWT_SECRET=cambiame-en-produccion          # generar con: openssl rand -hex 32
 JWT_ALGORITHM=HS256
 JWT_EXP_HOURS=12
@@ -165,9 +165,6 @@ pytest tests/test_telcopilot.py -v
 ```
 
 Cubre: auth (registro/login/me/JWT), catálogo, anonimización (8 tipos PII), sesiones (CRUD + ownership), LLM analyze/summary, roles, supervisor dashboard.
-
-### Frontend (Playwright)
-Flujos E2E validados: login, selección de incidencia, anonimización en vivo, análisis IA, checklist, generación de ticket, export PDF, clipboard Jira, dashboard supervisor.
 
 ---
 

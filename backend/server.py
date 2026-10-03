@@ -102,78 +102,119 @@ async def _get_session_or_404(session_id: str, operator_id: str) -> dict:
 
 
 # ---------- LLM ----------
+def _fallback_suggestion(incident_title: str, checklist: List[dict], anonymized_text: str) -> str:
+    done = [c['step'] for c in checklist if c.get('status') == 'ok']
+    pending = [c['step'] for c in checklist if c.get('status') != 'fail']
+    return (
+        f"DIAGNÓSTICO PROBABLE: El cliente presenta una incidencia de {incident_title}. "
+        "Se debe validar el estado del servicio y los pasos básicos del checklist antes de escalar.\n\n"
+        "PASOS RECOMENDADOS (orden de prioridad):\n"
+        "1. Verificar los datos básicos de la incidencia y la conectividad.\n"
+        "2. Revisar los pasos del checklist disponibles.\n"
+        "3. Documentar cualquier fallo detectado y preparar el escalado si no se resuelve.\n\n"
+        "SI NO SE RESUELVE: Escala a Nivel 2 con el historial de pasos comprobados y el texto anonimizado."
+    )
+
+
+def _fallback_summary(
+    incident_title: str, checklist: List[dict], anonymized_text: str, ai_suggestion: Optional[str]
+) -> str:
+    done = [c['step'] for c in checklist if c.get('status') == 'ok']
+    failed = [c['step'] for c in checklist if c.get('status') == 'fail']
+    pending = [c['step'] for c in checklist if c.get('status', 'pending') == 'pending']
+    return (
+        "## TICKET DE ESCALADO A NIVEL 2\n"
+        f"**Categoría:** {incident_title}\n"
+        f"**Síntoma reportado:** {anonymized_text or 'No especificado'}\n"
+        f"**Acciones Nivel 1 realizadas:** {done or ['Ninguna']}\n"
+        f"**Resultado:** {'Se han detectado fallos en algunos pasos' if failed else 'Checklist completado sin incidencias críticas'}\n"
+        "**Hipótesis técnica:** Se requiere revisión adicional por N2 para analizar el problema en detalle.\n"
+        "**Acción recomendada para N2:** Revisar el historial de pasos y continuar con los procedimientos de escalado."
+    )
+
+
 async def llm_suggest(incident_title: str, checklist: List[dict], anonymized_text: str) -> str:
-    """Ask Claude for a diagnosis suggestion based on anonymized description."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    """Ask Gemini for a diagnosis suggestion based on anonymized description."""
+    try:
+        import google.generativeai as genai
 
-    system = (
-        "Eres TelcoPilot, un asistente experto en soporte técnico de telecomunicaciones Nivel 1 "
-        "para teleoperadores en España (castellano/català). Ayudas al operador a diagnosticar "
-        "incidencias de forma rápida y precisa. Responde SIEMPRE en español, de forma concisa y "
-        "estructurada. NO pidas datos personales. El texto del cliente ya viene ANONIMIZADO "
-        "(verás marcadores como [REDACTED_NAME], [REDACTED_PHONE], etc.) — es normal, no pidas "
-        "esos datos al operador. Da pasos accionables y priorizados."
-    )
-    checklist_str = "\n".join(f"- {c['step']}" for c in checklist)
-    prompt = (
-        f"Tipo de incidencia: {incident_title}\n\n"
-        f"Checklist estándar disponible:\n{checklist_str}\n\n"
-        f"Descripción del cliente (anonimizada):\n\"{anonymized_text}\"\n\n"
-        "Devuelve tu respuesta en este formato exacto:\n\n"
-        "**DIAGNÓSTICO PROBABLE:** (1-2 frases)\n\n"
-        "**PASOS RECOMENDADOS (orden de prioridad):**\n"
-        "1. ...\n2. ...\n3. ...\n\n"
-        "**SI NO SE RESUELVE:** (cuándo y cómo escalar a Nivel 2)"
-    )
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY no configurada")
 
-    chat = LlmChat(
-        api_key=os.environ["EMERGENT_LLM_KEY"],
-        session_id=f"suggest-{uuid.uuid4()}",
-        system_message=system,
-    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-    resp = await chat.send_message(UserMessage(text=prompt))
-    return resp
+        system = (
+            "Eres TelcoPilot, un asistente experto en soporte técnico de telecomunicaciones Nivel 1 "
+            "para teleoperadores en España (castellano/català). Ayudas al operador a diagnosticar "
+            "incidencias de forma rápida y precisa. Responde SIEMPRE en español, de forma concisa y "
+            "estructurada. NO pidas datos personales. El texto del cliente ya viene ANONIMIZADO "
+            "(verás marcadores como [REDACTED_NAME], [REDACTED_PHONE], etc.) — es normal, no pidas "
+            "esos datos al operador. Da pasos accionables y priorizados."
+        )
+        checklist_str = "\n".join(f"- {c['step']}" for c in checklist)
+        prompt = (
+            f"Tipo de incidencia: {incident_title}\n\n"
+            f"Checklist estándar disponible:\n{checklist_str}\n\n"
+            f"Descripción del cliente (anonimizada):\n\"{anonymized_text}\"\n\n"
+            "Devuelve tu respuesta en este formato exacto:\n\n"
+            "**DIAGNÓSTICO PROBABLE:** (1-2 frases)\n\n"
+            "**PASOS RECOMENDADOS (orden de prioridad):**\n"
+            "1. ...\n2. ...\n3. ...\n\n"
+            "**SI NO SE RESUELVE:** (cuándo y cómo escalar a Nivel 2)"
+        )
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system)
+        resp = await model.generate_content_async(prompt)
+        return resp.text
+    except Exception as e:
+        logging.exception("LLM suggest failed, using fallback suggestion")
+        return _fallback_suggestion(incident_title, checklist, anonymized_text)
 
 
 async def llm_summary(
     incident_title: str, checklist: List[dict], anonymized_text: str, ai_suggestion: Optional[str]
 ) -> str:
     """Generate a Level-2 escalation ticket summary."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    try:
+        import google.generativeai as genai
 
-    system = (
-        "Eres TelcoPilot. Generas tickets de escalado a Nivel 2 claros, concisos y profesionales "
-        "para centros de soporte telco. NO incluyas datos personales del cliente — solo síntomas, "
-        "diagnósticos y acciones ya realizadas."
-    )
-    done = [c for c in checklist if c.get("status") == "ok"]
-    failed = [c for c in checklist if c.get("status") == "fail"]
-    pending = [c for c in checklist if c.get("status", "pending") == "pending"]
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY no configurada")
 
-    prompt = (
-        f"Incidencia: {incident_title}\n\n"
-        f"Descripción (anonimizada): \"{anonymized_text or 'No proporcionada'}\"\n\n"
-        f"Pasos verificados OK: {[d['step'] for d in done] or 'Ninguno'}\n"
-        f"Pasos fallidos: {[d['step'] for d in failed] or 'Ninguno'}\n"
-        f"Pasos pendientes: {[d['step'] for d in pending] or 'Ninguno'}\n\n"
-        f"Sugerencia IA previa: {ai_suggestion or 'N/A'}\n\n"
-        "Genera el ticket de escalado en este formato:\n\n"
-        "## TICKET DE ESCALADO A NIVEL 2\n"
-        "**Categoría:** ...\n"
-        "**Síntoma reportado:** ...\n"
-        "**Acciones Nivel 1 realizadas:** (lista)\n"
-        "**Resultado:** ...\n"
-        "**Hipótesis técnica:** ...\n"
-        "**Acción recomendada para N2:** ..."
-    )
+        system = (
+            "Eres TelcoPilot. Generas tickets de escalado a Nivel 2 claros, concisos y profesionales "
+            "para centros de soporte telco. NO incluyas datos personales del cliente — solo síntomas, "
+            "diagnósticos y acciones ya realizadas."
+        )
+        done = [c for c in checklist if c.get("status") == "ok"]
+        failed = [c for c in checklist if c.get("status") == "fail"]
+        pending = [c for c in checklist if c.get("status", "pending") == "pending"]
 
-    chat = LlmChat(
-        api_key=os.environ["EMERGENT_LLM_KEY"],
-        session_id=f"summary-{uuid.uuid4()}",
-        system_message=system,
-    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-    resp = await chat.send_message(UserMessage(text=prompt))
-    return resp
+        prompt = (
+            f"Incidencia: {incident_title}\n\n"
+            f"Descripción (anonimizada): \"{anonymized_text or 'No proporcionada'}\"\n\n"
+            f"Pasos verificados OK: {[d['step'] for d in done] or 'Ninguno'}\n"
+            f"Pasos fallidos: {[d['step'] for d in failed] or 'Ninguno'}\n"
+            f"Pasos pendientes: {[d['step'] for d in pending] or 'Ninguno'}\n\n"
+            f"Sugerencia IA previa: {ai_suggestion or 'N/A'}\n\n"
+            "Genera el ticket de escalado en este formato:\n\n"
+            "## TICKET DE ESCALADO A NIVEL 2\n"
+            "**Categoría:** ...\n"
+            "**Síntoma reportado:** ...\n"
+            "**Acciones Nivel 1 realizadas:** (lista)\n"
+            "**Resultado:** ...\n"
+            "**Hipótesis técnica:** ...\n"
+            "**Acción recomendada para N2:** ..."
+        )
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system)
+        resp = await model.generate_content_async(prompt)
+        return resp.text
+    except Exception as e:
+        logging.exception("LLM summary failed, using fallback summary")
+        return _fallback_summary(incident_title, checklist, anonymized_text, ai_suggestion)
 
 
 # ---------- Auth routes ----------
@@ -489,10 +530,28 @@ async def seed_supervisor():
     )
 
 
+async def seed_default_operator():
+    op_email = "operador@telco.es"
+    existing = await db.users.find_one({"email": op_email})
+    if existing:
+        return
+    await db.users.insert_one(
+        {
+            "id": str(uuid.uuid4()),
+            "email": op_email,
+            "name": "Operador Demo",
+            "role": "operator",
+            "password_hash": hash_password("telco123"),
+            "created_at": now_iso(),
+        }
+    )
+
+
 @app.on_event("startup")
 async def on_startup():
     try:
         await seed_supervisor()
+        await seed_default_operator()
     except Exception:
         logging.exception("Seeding supervisor failed")
 

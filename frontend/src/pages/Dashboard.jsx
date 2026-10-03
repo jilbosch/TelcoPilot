@@ -472,13 +472,3 @@ function EscalationBadge({ rate }) {
         </span>
     );
 }
- 0.6 ? "#F59E0B" : "#EF4444";
-    return (
-        <span
-            className="font-mono font-semibold"
-            style={{ color }}
-        >
-            {pct}%
-        </span>
-    );
-}

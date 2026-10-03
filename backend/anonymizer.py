@@ -6,8 +6,8 @@ BEFORE any text is sent to the LLM. This is the GDPR safety layer.
 import re
 from typing import Tuple, List, Dict
 
-# Spanish DNI: 8 digits + letter
-DNI_RE = re.compile(r"\b\d{8}[A-HJ-NP-TV-Z]\b", re.IGNORECASE)
+# Spanish DNI: 7-8 digits + letter
+DNI_RE = re.compile(r"\b\d{7,8}[A-HJ-NP-TV-Z]\b", re.IGNORECASE)
 # Spanish NIE: X/Y/Z + 7 digits + letter
 NIE_RE = re.compile(r"\b[XYZ]\d{7}[A-HJ-NP-TV-Z]\b", re.IGNORECASE)
 # Spanish phone: 9 digits starting 6,7,8,9, with optional country code +34
@@ -25,7 +25,7 @@ POSTAL_RE = re.compile(r"\b(?:CP|c\.p\.|código postal|codigo postal)\s*:?\s*(\d
 
 # Name patterns: "me llamo X", "soy X Y", "mi nombre es X", "cliente: X Y"
 NAME_PATTERNS = [
-    re.compile(r"(me llamo|mi nombre es|soy el cliente|soy la cliente|soy|cliente\s*[:\-]|client\s*[:\-]|em dic|el meu nom és)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2})", re.IGNORECASE),
+    re.compile(r"(me llamo|mi nombre es|soy el cliente|soy la cliente|soy|cliente\s*[:\-]|client\s*[:\-]|em dic|el meu nom és|el meu nom es|nom és|nom es)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2})", re.IGNORECASE),
 ]
 
 # Address patterns: "calle X", "carrer X", "avenida X", "av. X"
