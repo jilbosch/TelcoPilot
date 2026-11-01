@@ -1,40 +1,39 @@
 # TelcoPilot
 
-> **Copiloto IA para soporte técnico de telecomunicaciones Nivel 1.**
-> Diagnóstico guiado, asistencia IA y escalados a Nivel 2 sin comprometer datos sensibles.
+Copiloto con IA para operadores de soporte técnico de nivel 1 en telecomunicaciones. Guía el diagnóstico, sugiere pasos con IA y prepara el ticket de escalado a nivel 2 sin que la IA vea datos personales del cliente.
 
 ![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20React%20%2B%20MongoDB-0055FF)
 ![AI](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-00E5FF)
-![GDPR](https://img.shields.io/badge/RGPD-Compliant-8B5CF6)
+![RGPD](https://img.shields.io/badge/RGPD-anonimizaci%C3%B3n-8B5CF6)
 ![License](https://img.shields.io/badge/license-Proprietary-111827)
 
 ---
 
-## 📋 El problema
+## El problema
 
-Los teleoperadores de **Nivel 1** en call centers de telecomunicaciones enfrentan el mismo patrón cada día:
+Los teleoperadores de Nivel 1 en call centers de telecomunicaciones enfrentan el mismo patrón cada día:
 
 1. El cliente llama con un problema (fibra caída, sin datos, roaming, APN…).
 2. El operador busca en manuales internos, pregunta al supervisor, pierde tiempo.
 3. Resultado: llamadas largas, AHT alto, escalados innecesarios a Nivel 2, clientes insatisfechos.
 
-Además, los operadores manejan **datos personales del cliente** (DNI, teléfono, dirección) por lo que cualquier asistente IA debe cumplir RGPD estrictamente.
+Además, los operadores manejan datos personales del cliente (DNI, teléfono, dirección) por lo que cualquier asistente IA debe cumplir RGPD estrictamente.
 
 ---
 
-## 💡 La solución
+## La solución
 
-**TelcoPilot** es un copiloto IA diseñado específicamente para Nivel 1:
+TelcoPilot está pensado para el operador de nivel 1:
 
-- ✅ **Diagnóstico guiado paso a paso** con checklists predefinidos por tipo de incidencia.
-- ✅ **Sugerencias IA** basadas en el texto libre del operador (Gemini 2.5 Flash).
-- ✅ **Anonimización automática** de datos sensibles **antes** de enviar a la IA — el LLM nunca ve PII.
-- ✅ **Tickets de escalado a Nivel 2** generados con un clic, exportables a PDF o formato Jira.
-- ✅ **Dashboard de supervisor** con KPIs agregados (TMO, FCR, escalados, ranking).
+- Diagnóstico guiado paso a paso con checklists predefinidos por tipo de incidencia.
+- Sugerencias IA basadas en el texto libre del operador (Gemini 2.5 Flash).
+- Anonimización automática de datos sensibles antes de enviar el texto a la IA. El modelo nunca ve datos personales.
+- Tickets de escalado a Nivel 2 generados con un clic, exportables a PDF o formato Jira.
+- Dashboard de supervisor con KPIs agregados (TMO, FCR, escalados, ranking).
 
 ---
 
-## 📸 Pantallas
+## Pantallas
 
 ### Login (acceso operador / supervisor)
 Tema oscuro estilo NOC (Network Operations Center), colores azul eléctrico + cian, tipografía Chivo + IBM Plex Mono.
@@ -44,7 +43,7 @@ Layout en "sala de control" con 4 paneles:
 1. Grid de 8 incidencias (Sin datos / APN / Roaming / Fibra caída / Router / Portabilidad / Microcortes / Velocidad).
 2. Textarea del operador + vista anonimizada en paralelo (chips violetas sobre los datos redactados).
 3. Checklist con botones OK/FAIL + sugerencia IA paso a paso.
-4. Generador de ticket con botones: **Generar ticket**, **Copiar**, **Jira**, **PDF**.
+4. Generador de ticket con botones: Generar ticket, Copiar, Jira, PDF.
 
 ### Dashboard (supervisor)
 - 6 KPIs: Sesiones totales / Hoy / Últimos 7 días / Escaladas / Tasa escalado / TMO medio.
@@ -54,7 +53,7 @@ Layout en "sala de control" con 4 paneles:
 
 ---
 
-## 🧱 Arquitectura
+## Arquitectura
 
 ```
 ┌──────────────────┐      HTTPS       ┌──────────────────────┐
@@ -71,10 +70,10 @@ Layout en "sala de control" con 4 paneles:
 ```
 
 ### Tech stack
-- **Backend:** Python 3.11, FastAPI, Motor (async Mongo), PyJWT, bcrypt, google-generativeai (Gemini 2.5 Flash).
-- **Frontend:** React 19, react-router-dom 7, Tailwind CSS, lucide-react, recharts, jsPDF, axios.
-- **Database:** MongoDB (2 collections: `users`, `sessions`).
-- **Auth:** JWT con `role` claim (`operator` / `supervisor` / `admin`).
+- Backend: Python 3.11, FastAPI, Motor (async Mongo), PyJWT, bcrypt, google-generativeai (Gemini 2.5 Flash).
+- Frontend: React 19, react-router-dom 7, Tailwind CSS, lucide-react, recharts, jsPDF, axios.
+- Database: MongoDB (2 collections: `users`, `sessions`).
+- Auth: JWT con `role` claim (`operator` / `supervisor` / `admin`).
 
 ### Flujo de anonimización (clave RGPD)
 ```
@@ -95,11 +94,11 @@ Backend recibe texto
             ▼
    Diagnóstico sugerido
 ```
-**El LLM nunca ve datos personales.** Es el principal argumento RGPD.
+El LLM nunca ve datos personales. Es el principal argumento RGPD.
 
 ---
 
-## 🚀 Instalación local
+## Instalación local
 
 ### Requisitos
 - Python 3.11+
@@ -141,7 +140,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 
 ---
 
-## 🔐 Credenciales de prueba
+## Credenciales de prueba
 
 El backend crea automáticamente un usuario supervisor al arrancar.
 
@@ -152,11 +151,11 @@ El backend crea automáticamente un usuario supervisor al arrancar.
 
 Para crear operadores adicionales, usar la página de registro en `/register`.
 
-> ⚠️ En producción **cambiar** el `JWT_SECRET` y cambiar las contraseñas por defecto.
+> En producción **cambiar** el `JWT_SECRET` y cambiar las contraseñas por defecto.
 
 ---
 
-## 🧪 Tests
+## Tests
 
 ### Backend (pytest, 32 tests)
 ```bash
@@ -168,7 +167,7 @@ Cubre: auth (registro/login/me/JWT), catálogo, anonimización (8 tipos PII), se
 
 ---
 
-## 📡 API
+## API
 
 Todas las rutas bajo `/api/`.
 
@@ -196,55 +195,28 @@ Todas las rutas bajo `/api/`.
 
 ---
 
-## 💰 ROI estimado
+## Roadmap
 
-Ejemplo realista para un call center medio:
-
-| Métrica                       | Valor           |
-|-------------------------------|-----------------|
-| Llamadas/día                  | 1.000           |
-| TMO actual                    | 8 min           |
-| Reducción TMO con TelcoPilot  | **1 min/llamada**|
-| Ahorro diario                 | 1.000 min (~16h) |
-| Coste hora operador           | ~20 €           |
-| **Ahorro anual** (200 días)   | **~64.000 €**   |
-
-Con 10 operadores a tiempo completo, el ROI aparece en < 2 meses.
-
----
-
-## 🛣 Roadmap
-
-### ✅ Entregado
+### Hecho
 - MVP: auth, anonimización, diagnóstico guiado, IA, escalado.
 - Roles + dashboard supervisor + export PDF/Jira.
 
-### 🔜 Próximo
+### Siguiente
 - Traductor en tiempo real **Catalán ↔ Castellano**.
 - Streaming SSE de respuestas IA (menos latencia percibida).
 - Rate limiting en `/auth/login`.
 - Informe semanal exportable desde el dashboard.
 
-### 💭 Visión
-- Voz-a-texto con Whisper (copiloto en llamada real).
-- Integración CRM con contexto anonimizado.
-- Multi-tenant / white-label para subcontratas que revenden a telcos.
+---
+
+## Licencia
+
+Código propietario, todos los derechos reservados. Para uso comercial o personalización, contacta conmigo.
 
 ---
 
-## 📄 Licencia
+## Autor
 
-Proprietary — todos los derechos reservados.
-Este software está concebido como **herramienta interna/comercial** para centros de atención al cliente de telecomunicaciones.
-Contactar con el autor para licenciamiento, uso comercial o personalización.
+Joan Gil Bosch. Trabajé de técnico de helpdesk de nivel 1 y TelcoPilot nace de lo que vi allí: mucho tiempo buscando en manuales y escalados que se podían evitar.
 
----
-
-## 🙋 Autor
-
-Proyecto desarrollado como **prototipo funcional para evaluación interna** en un call center telco.
-Para demos, personalización o integración con sistemas CRM propios, contactar.
-
----
-
-**TelcoPilot** — *reducir TMO. aumentar FCR. proteger al cliente.*
+[jilbosch.com](https://jilbosch.com) · [LinkedIn](https://www.linkedin.com/in/joangilbosch)
